@@ -37,6 +37,7 @@
 #define MAX_INPUT 80
 #define PERMIT_TYPE 2
 #define PERMIT_SIZE 2
+#define clean_buffer while(getchar()!='\n');
 
 
 pthread_t multicast_thread;
@@ -67,7 +68,6 @@ uint8_t Recive_Permit();
 
 
 void Send_Hello(){
-
 
 
 	uint16_t * cast;
@@ -165,7 +165,7 @@ void Connect_To_Station(int stationNumber){
 	addr.s_addr = inet_addr(stations_ip);
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_addr.sin_port = stations_port;
+	server_addr.sin_port = htons(stations_port);
 
 	// open a socket, ipv4, udp
 	if ( (udp_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0 )
@@ -188,7 +188,7 @@ void Connect_To_Station(int stationNumber){
 
 	pthread_create(&multicast_thread, NULL, Listen_to_Station, &server_addr);
 
-	pthread_join(multicast_thread, NULL);
+	//pthread_join(multicast_thread, NULL);
 
 }
 
@@ -219,13 +219,11 @@ void * Listen_to_Station(void * args){
 		tv.tv_sec = 10;
 		tv.tv_usec = 0;
 
-		puts("test");
-
 		retval = select (udp_sock + 1, &rdfs, NULL, NULL, &tv);
 
-
+	printf("3434\n");
 		if(retval){
-
+printf("6767\n");
 			//Receive a reply from the server
 			num_of_bytes = recvfrom(udp_sock, buffer, BUFFER_SIZE, 0, server_addr, &addr_len);
 
@@ -303,10 +301,12 @@ void Start_Connection(){
 }
 
 void Close_All(){
-
+	printf("1");
 	close(udp_sock);
+	printf("2");
 	close(sock);
 	pthread_exit(multicast_thread);
+	printf("3");
 }
 
 void print_menu(){
@@ -319,24 +319,24 @@ void print_menu(){
 
 void Ask_Song(){
 
-	char * songName, * input, ans;
-	int retval;
+	char songName[80] = {0}, ans;
+	int retval, input;
 	struct timeval tv;
 	fd_set rfds;
 
 	printf("Please insert station number: \n");
 
-	scanf(input);
-
-	if(atoi(input) > num_of_stations || atoi(input) < 0 ){
+	scanf("%d",&input);
+	clean_buffer;
+	if(input > num_of_stations || input < 0 ){
 
 		Close_All();
 		printf("Wrong input - num of station not legal, Bye Bye..\n");
 		exit(EXIT_FAILURE);
 
 	}
-
-	Send_Ask_Song(atoi(input));
+	printf("try");
+	Send_Ask_Song(input);
 
 	/* Wait up to five seconds. */
 	tv.tv_sec = 0;
@@ -396,13 +396,14 @@ void Ask_Song(){
 
 			}
 
-			strncpy (songName, msg + 2, msg[1]);
+			strncpy (songName, (char*)(msg + 2), (int)msg[1]);
 
 			printf("Station number: %d, Song playing on station: %s\n", input, songName);
 
 			printf("Do you want to switch to this station (Y/N):");
 
-			fscanf("%c", ans);
+			ans = getchar();
+			clean_buffer;
 
 			switch(ans){
 
@@ -601,7 +602,7 @@ uint8_t Recive_Permit(){
 
 int main(int argc, char * argv[]){
 
-	char input[MAX_INPUT];
+	char input;
 
 	struct timeval tv;
 
@@ -637,37 +638,37 @@ int main(int argc, char * argv[]){
 
 	while(TRUE){
 
-		if(fgets(input, 79, stdin) != NULL){
+		input = getchar();
 
-			switch(* input){
+		if(getchar() != '\n') input = 'e';
 
-			case 'n':
+		switch(input){
 
-				Ask_Song();
+		case 'n':
 
-				break;
+			Ask_Song();
 
-			case 's':
+			break;
 
-				Up_Song();
+		case 's':
 
-				break;
+			Up_Song();
 
-			case 'q':
+			break;
 
-				Close_All();
-				printf("You have chosen to quit, Bye Bye..\n");
-				exit(EXIT_SUCCESS);
+		case 'q':
 
-				break;
+			Close_All();
+			printf("You have chosen to quit, Bye Bye..\n");
+			exit(EXIT_SUCCESS);
 
-			default:
+			break;
 
-				Close_All();
-				printf("Wrong input, Bye Bye..\n");
-				exit(EXIT_FAILURE);
+		default:
+			printf("Wrong input, Bye Bye..\n");
+			Close_All();
+			exit(EXIT_FAILURE);
 
-			}
 		}
 		tv.tv_sec = 0;
 		tv.tv_usec = 100;
@@ -711,4 +712,3 @@ int main(int argc, char * argv[]){
 		}
 	}
 }
-
