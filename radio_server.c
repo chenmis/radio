@@ -33,7 +33,7 @@ uint16_t listen_port;
 struct sockaddr_in server_addr;
 uint16_t udp_port;
 int num_of_stations, num_of_clients = 0;
-char * files_names[MAX_STATIONS], multicastip[15];
+char files_names[MAX_STATIONS][80], multicastip[15];
 pthread_t clients[MAX_CLIENTS], stations[MAX_STATIONS];
 int udp_sockets[MAX_STATIONS];
 pthread_mutex_t lock;
@@ -44,6 +44,7 @@ void * open_Station(void * args);
 void * open_tcp_sock();
 void * client_thread(void * args);
 void send_invalid_comment(int client_sock ,char * comment);
+void send_new_station();
 
 void * open_Station(void * args){
 
@@ -54,11 +55,13 @@ void * open_Station(void * args){
 
 	// open file
 	files[station_num] = fopen(files_names[ station_num ],"r");
+
 	if(files[station_num] == NULL)
 	{
 		perror("can't open file");
 		exit(EXIT_FAILURE);
 	}
+	printf("file: %d opend\n",station_num);
 
 	// reset buffer and server address
 	memset(&buffer, 0, sizeof( buffer ));
@@ -75,12 +78,16 @@ void * open_Station(void * args){
 		perror("socket creation failed");
 		exit(EXIT_FAILURE);
 	}
+	printf("socket: %d opend\n",station_num);
+
 	// bind connection (socket) to port and interface
 	if(bind(udp_sockets[station_num], (struct sockaddr *)&server_addr, sizeof(struct sockaddr_in))<0)
 	{
 		perror("Bind failed");
 		exit(EXIT_FAILURE);
 	}
+	printf("%d. bind\n",station_num);
+
 	// initialize time to live field
 	//setsockopt(udp_sockets[station_num], IPPROTO_IP, IP_MULTICAST_TTL, &ttl,sizeof(ttl));
 
@@ -108,6 +115,7 @@ void * open_tcp_sock(){
 		perror("socket failed");
 		exit(EXIT_FAILURE);
 	}
+	printf("welcome socket open\n");
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -118,6 +126,7 @@ void * open_tcp_sock(){
 		perror("socket failed");
 		exit(EXIT_FAILURE);
 	}
+	printf("bind\n");
 
 	if( !listen(welcomeSock,SOMAXCONN))
 	{
@@ -133,6 +142,8 @@ void * open_tcp_sock(){
 	while(TRUE){
 
 		newSock = accept(welcomeSock, (struct sockaddr *)&client_addr, &client_len);
+
+		printf("new client arrived (num: %d)\n", num_of_clients + 1);
 
 		pthread_create(&clients[num_of_clients], NULL, client_thread, &(newSock));
 
@@ -169,6 +180,8 @@ void * client_thread(void * args){
 	* cast = inet_addr(multicastip);
 	cast = (uint16_t *)(msg + 8);
 	* cast = udp_port;
+
+	printf("hello received\n");
 
 	send( * sock, msg, WELCOME_SIZE, 0);
 
@@ -245,6 +258,10 @@ void * client_thread(void * args){
 					}
 
 					rewind(files[num_of_stations]);
+
+					i = num_of_stations;
+
+					open_Station(&i);
 
 					num_of_stations ++;
 
@@ -327,10 +344,14 @@ void * main(int argc, char * argv[]){
 
 	for( i = 0 ; i < num_of_stations ; i ++ ){
 
-		pthread_create(&stations, NULL, open_Station, &(i));
+		pthread_create(&stations[i], NULL, open_Station, &(i));
+
+		sleep(3);
 
 	}
 
 	open_tcp_sock();
+
+	while(TRUE){}; return EXIT_SUCCESS;
 
 }
