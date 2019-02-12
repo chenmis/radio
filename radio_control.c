@@ -74,7 +74,7 @@ void Send_Hello(){
 
 	//constract hello massege
 	msg[0] = HELLO_TYPE;
-	cast = msg + 1;
+	cast = (uint16_t*)(msg + 1);
 	* cast = htons(HELLO_RESERVED);
 
 	//send hello massege
@@ -87,7 +87,7 @@ void Send_Ask_Song(uint16_t stationNumber){
 
 	//constract ask song massege
 	msg[0] = ASK_SONG_TYPE;
-	cast = msg + 1;
+	cast = (uint16_t*)(msg + 1);
 	* cast = htons(stationNumber);
 
 	//send ask song massege
@@ -195,19 +195,18 @@ void Connect_To_Station(int stationNumber){
 void * Listen_to_Station(void * args){
 
 	struct sockaddr_in * server_addr = args;
-	int num_of_bytes, retval, addr_len;
+	int num_of_bytes, retval;
+	void * plaster;
 	struct ip_mreq imreq;
-	uint8_t buffer[1024];
-	FILE * songfp;
+	const FILE * songfp;
+	char buffer[BUFFER_SIZE + 1];
 	fd_set rdfs;
 	struct timeval tv;
-
+	socklen_t addr_len;
 
 	buffer[0]='c';
 
-	songfp = popen("play -t mp3 -> /dev/null 2>&1", "w");
-
-
+	songfp = popen("play -t mp3 -> /dev/null 2>&1", "w"); plaster = songfp;
 
 	addr_len = sizeof(struct sockaddr_in);
 
@@ -216,30 +215,32 @@ void * Listen_to_Station(void * args){
 		FD_ZERO(&rdfs);
 		FD_SET(udp_sock, &rdfs);
 
-		tv.tv_sec = 10;
+		tv.tv_sec = 2;
 		tv.tv_usec = 0;
 
 		retval = select (udp_sock + 1, &rdfs, NULL, NULL, &tv);
 
-	printf("3434\n");
 		if(retval){
-printf("6767\n");
-			//Receive a reply from the server
-			num_of_bytes = recvfrom(udp_sock, buffer, BUFFER_SIZE, 0, server_addr, &addr_len);
 
+			//Receive a reply from the server
+			num_of_bytes = recvfrom(udp_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &server_addr, &addr_len);
+			songfp = plaster;
 			if( num_of_bytes < 0  )
 			{
 				perror("Receive udp failed");
 				exit(EXIT_FAILURE);
 			} else if( num_of_bytes > 0) {
 
-				fwrite (buffer , sizeof(char), num_of_bytes, songfp);
+				//fwrite (buffer , sizeof(char), num_of_bytes, songfp);
 
 				memset((void *)buffer,0,1024);
 			}
+
 		}
 
 		if( switch_station ){
+
+			printf("change station to  %d\n",stationNumber);
 
 			setsockopt(udp_sock, IPPROTO_IP, IP_DROP_MEMBERSHIP,(const void *)&imreq, sizeof(struct ip_mreq));
 
@@ -263,11 +264,11 @@ void Send_Up_Song(int32_t songSize, uint8_t songNameSize, char * songName){
 
 	//constract up song massege
 	msg[0] = UP_SONG_TYPE;
-	cast = msg + 1;
+	cast =(uint32_t*)(msg + 1);
 	* cast = htonl(songSize);
 	msg[5] = songNameSize;
-	cast = msg + 6;
-	* cast = songName;
+	cast = (uint32_t*)(msg + 6);
+	* cast = (uint32_t)(songName);
 
 	//send up song massege
 	send(sock, msg, UP_SONG_SIZE, 0);
@@ -305,7 +306,7 @@ void Close_All(){
 	close(udp_sock);
 	printf("2");
 	close(sock);
-	pthread_exit(multicast_thread);
+	pthread_exit(&multicast_thread);
 	printf("3");
 }
 
@@ -324,7 +325,7 @@ void Ask_Song(){
 	struct timeval tv;
 	fd_set rfds;
 
-	printf("Please insert station number: \n");
+	printf("Please insert station number: ");
 
 	scanf("%d",&input);
 	clean_buffer;
@@ -335,7 +336,7 @@ void Ask_Song(){
 		exit(EXIT_FAILURE);
 
 	}
-	printf("try");
+
 	Send_Ask_Song(input);
 
 	/* Wait up to five seconds. */
@@ -444,17 +445,17 @@ void Up_Song(){
 
 	/*---------we are here---------*/
 	uint32_t * cast;
-	int bool, nameSize, songSize, permit;
-	char * songName, *path_of_song, *last;
+	unsigned int bool, nameSize, songSize, permit;
+	char * songName, path_of_song[80] = {0}, *last;
 	FILE * song;
 
 	do{
 
 		bool = 0;
 
-		printf("Please insert path of song: \n");
+		printf("Please insert path of song: ");
 
-		scanf(path_of_song);
+		scanf("%s",path_of_song);
 
 		songName = strtok(path_of_song, "/");
 
@@ -481,9 +482,10 @@ void Up_Song(){
 	}while(bool);
 
 	fseek(song, 0L, SEEK_END);
-	songSize = ftell(song);
+	songSize = ftell(song); //file's size in bytes
+	rewind(song);
 
-	if(songSize < 2000 || songSize > 10485760){
+	if(songSize < 2000 || songSize > 1048576000){
 
 		perror("file size error\n");
 
@@ -491,7 +493,8 @@ void Up_Song(){
 
 	}
 
-	rewind(song);
+
+
 
 	msg[0] = UP_SONG_TYPE;
 	cast = msg + 1;
@@ -545,7 +548,7 @@ uint8_t Recive_Permit(){
 
 	else if ( retval == 0 ){
 
-		perror("Timeout occur at Ask_song");
+		perror("2Timeout occur at Ask_song");
 		Close_All();
 		exit(EXIT_FAILURE);
 
@@ -610,8 +613,6 @@ int main(int argc, char * argv[]){
 
 	int retval;
 
-	printf("hello");
-
 	tcp_ip = argv[1];
 
 	tcp_port = atoi(argv[2]);
@@ -634,13 +635,13 @@ int main(int argc, char * argv[]){
 
 	Connect_To_Station(0);
 
-	print_menu();
-
 	while(TRUE){
+
+		print_menu();
 
 		input = getchar();
 
-		if(getchar() != '\n') input = 'e';
+		clean_buffer;
 
 		switch(input){
 
@@ -671,7 +672,7 @@ int main(int argc, char * argv[]){
 
 		}
 		tv.tv_sec = 0;
-		tv.tv_usec = 100;
+		tv.tv_usec = 300;
 
 		FD_ZERO(&rfds);
 		FD_SET(sock, &rfds);
@@ -684,13 +685,7 @@ int main(int argc, char * argv[]){
 
 			perror("Timeout_Occur error");
 
-		else if ( retval == 0 ){
-
-			perror("Timeout occur at Ask_song");
-			Close_All();
-			exit(EXIT_FAILURE);
-
-		} else {
+		if ( retval != 0 ){
 
 			recv(sock, msg, BUFFER_SIZE, 0);
 
@@ -712,3 +707,4 @@ int main(int argc, char * argv[]){
 		}
 	}
 }
+
