@@ -32,7 +32,7 @@
 uint16_t listen_port;
 struct sockaddr_in server_addr;
 uint16_t udp_port;
-int num_of_stations, num_of_clients = 0;
+int num_of_stations = 0, num_of_clients = 0;
 char files_names[MAX_STATIONS][80], multicastip[15];
 pthread_t clients[MAX_CLIENTS], stations[MAX_STATIONS];
 int udp_sockets[MAX_STATIONS];
@@ -68,7 +68,7 @@ void * open_Station(void * args){
 	memset(&server_addr, 0, sizeof(server_addr));
 
 	// initialize connection settings
-	server_addr.sin_family = AF_INET;
+./	server_addr.sin_family = AF_INET;
 	server_addr.sin_addr.s_addr = inet_addr(multicastip);
 	server_addr.sin_port = htons(udp_port);
 
@@ -89,7 +89,7 @@ void * open_Station(void * args){
 	printf("%d. bind\n",station_num);
 
 	// initialize time to live field
-	//setsockopt(udp_sockets[station_num], IPPROTO_IP, IP_MULTICAST_TTL, &ttl,sizeof(ttl));
+	setsockopt(udp_sockets[station_num], IPPROTO_IP, IP_MULTICAST_TTL, &ttl,sizeof(ttl));
 
 	addr_size = sizeof( server_addr );
 
@@ -158,6 +158,7 @@ void * client_thread(void * args){
 	int num_of_bytes, * sock = args, station_num, song_size;
 	uint16_t * cast;
 	uint32_t * cast32;
+
 	char songName[80];
 	int i;
 
@@ -174,12 +175,12 @@ void * client_thread(void * args){
 	}
 
 	msg[0] = WELCOME_TYPE;
-	cast = (uint16_t *)(msg + 2);
-	* cast = num_of_stations;
-	cast32 = (uint32_t *)(msg + 4);
-	* cast = inet_addr(multicastip);
-	cast = (uint16_t *)(msg + 8);
-	* cast = udp_port;
+	cast = (uint16_t *)(msg + 1);
+	* cast = ntohs(num_of_stations);
+	cast32 = (uint32_t *)(msg + 3);
+	* cast32 = ntohl(inet_addr(multicastip));
+	cast = (uint16_t *)(msg + 7);
+	* cast = ntohs(udp_port);
 
 	printf("hello received\n");
 
@@ -191,6 +192,7 @@ void * client_thread(void * args){
 
 			perror("client out");
 			close(* sock);
+			return NULL;
 
 		}
 
@@ -206,7 +208,7 @@ void * client_thread(void * args){
 			}
 
 			msg[0] = ANNOUNCE_TYPE;
-			station_num = (int)((uint16_t *)(msg + 1));
+			station_num = (int)(*(uint16_t *)(msg + 1));
 			msg[1] = sizeof(files_names[station_num])/sizeof(uint8_t);
 			strcpy((char *)(msg + 2), files_names[station_num]);
 
