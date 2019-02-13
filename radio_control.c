@@ -140,7 +140,7 @@ void Get_Welcome_Msg(){
 void Connect_To_Station(int stationNumber){
 
 	struct sockaddr_in server_addr;
-	socklen_t addr_size;
+	socklen_t addr_size = 0;
 	struct ip_mreq imreq;
 	struct in_addr addr;
 
@@ -340,8 +340,8 @@ void Ask_Song(){
 	Send_Ask_Song(input);
 
 	/* Wait up to five seconds. */
-	tv.tv_sec = 0;
-	tv.tv_usec = 300;
+	tv.tv_sec = 2;
+	tv.tv_usec = 0;
 
 	FD_ZERO(&rfds);
 	FD_SET(sock, &rfds);
@@ -356,8 +356,8 @@ void Ask_Song(){
 	else if ( retval == 0 ){
 
 		perror("Timeout occur at Ask_song");
-		Close_All();
-		exit(EXIT_FAILURE);
+		//Close_All();
+		//exit(EXIT_FAILURE);
 
 	} else {
 
@@ -469,7 +469,7 @@ void Up_Song(){
 
 		songName = last;
 
-		nameSize = sizeof(songName)/sizeof(uint8_t);
+		nameSize = strlen(songName);
 
 		if(!(song = fopen(path_of_song,"r"))){
 
@@ -483,9 +483,9 @@ void Up_Song(){
 
 	fseek(song, 0L, SEEK_END);
 	songSize = ftell(song); //file's size in bytes
-	rewind(song);
+	rewind(song); songSize = 200000;
 
-	if(songSize < 2000 || songSize > 1048576000){
+	if(songSize < 2000 || songSize > 10485760){
 
 		perror("file size error\n");
 
@@ -500,7 +500,7 @@ void Up_Song(){
 	cast = msg + 1;
 	* cast = htonl(songSize);
 	msg[5] = nameSize;
-	strncpy(msg + UP_SONG_SIZE, songName, nameSize);
+	strncpy(msg + 6, songName, nameSize);
 
 	send(sock, msg, nameSize + UP_SONG_SIZE,0);
 
@@ -536,7 +536,7 @@ uint8_t Recive_Permit(){
 	FD_ZERO(&rfds);
 	FD_SET(sock, &rfds);
 
-	tv.tv_sec = 0;
+	tv.tv_sec = 5;
 	tv.tv_usec = 300;
 
 	retval = select(sock + 1, &rfds, NULL, NULL, &tv);
