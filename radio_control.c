@@ -223,7 +223,7 @@ void * Listen_to_Station(void * args){
 		if(retval){
 
 			//Receive a reply from the server
-			num_of_bytes = recvfrom(udp_sock, buffer, BUFFER_SIZE, 0, (struct sockaddr *) &server_addr, &addr_len);
+			num_of_bytes = recvfrom(udp_sock, buffer, BUFFER_SIZE, 0, server_addr, &addr_len);
 			songfp = plaster;
 			if( num_of_bytes < 0  )
 			{
