@@ -35,7 +35,7 @@ uint16_t udp_port;
 int num_of_stations = 0, num_of_clients = 0;
 char files_names[MAX_STATIONS][80], multicastip[15];
 pthread_t clients[MAX_CLIENTS], stations[MAX_STATIONS];
-int udp_sockets[MAX_STATIONS];
+int udp_sockets[MAX_STATIONS], tcp_sockets[MAX_CLIENTS];
 pthread_mutex_t lock;
 FILE * files[MAX_STATIONS];
 int welcomeSock;
@@ -52,6 +52,7 @@ void * open_Station(void * args){
 	uint8_t buffer[BUFFER_SIZE];
 	socklen_t addr_size;
 	u_char ttl = 10;
+	char new_multicastip[15];
 
 	// open file
 	files[station_num] = fopen(files_names[ station_num ],"r");
@@ -67,9 +68,12 @@ void * open_Station(void * args){
 	memset(&buffer, 0, sizeof( buffer ));
 	memset(&server_addr, 0, sizeof(server_addr));
 
+	strcpy(new_multicastip, multicastip);
+	new_multicastip[strlen(new_multicastip)-1] += station_num;
+
 	// initialize connection settings
-./	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = inet_addr(multicastip);
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = inet_addr(new_multicastip);
 	server_addr.sin_port = htons(udp_port);
 
 	// open a socket, ipv4, udp
@@ -146,6 +150,8 @@ void * open_tcp_sock(){
 		printf("new client arrived (num: %d)\n", num_of_clients + 1);
 
 		pthread_create(&clients[num_of_clients], NULL, client_thread, &(newSock));
+
+		tcp_sockets[num_of_clients] = newSock;
 
 		num_of_clients ++;
 	}
@@ -227,7 +233,7 @@ void * client_thread(void * args){
 
 				for( i = 0 ; i < num_of_stations ; i ++ ){
 
-					if( strcmp(songName, files_names[i]) != FALSE){
+					if( strcmp(songName, files_names[i]) == 0){
 
 						msg[1] = FALSE;
 
@@ -261,11 +267,15 @@ void * client_thread(void * args){
 
 					rewind(files[num_of_stations]);
 
+					fclose(files[num_of_stations]);
+
+					strcpy(files_names[num_of_stations],songName);
+
 					i = num_of_stations;
 
-					open_Station(&i);
+					pthread_create(&stations[i], NULL, open_Station, &(i));
 
-					num_of_stations ++;
+					sleep(3); num_of_stations ++;
 
 					send_new_station();
 
@@ -295,11 +305,14 @@ void * client_thread(void * args){
 void send_new_station(){
 
 	uint8_t msg[3];
+	int i;
 
 	msg[0] = 4;
-	*(uint16_t *)(msg + 1) = num_of_stations;
+	*(uint16_t *)(msg + 1) = ntohs(num_of_stations + 1);
 
-	send(welcomeSock, msg, 3, 0);
+	for( i = 0 ; i < num_of_clients ; i ++ )
+
+		send(tcp_sockets[i], msg, 3, 0);
 
 }
 
@@ -322,7 +335,7 @@ void * main(int argc, char * argv[]){
 
 	int i;
 
-	if( argc < 5 ){
+if( argc < 5 ){
 
 		perror("To few argumants");
 		exit(EXIT_FAILURE);
