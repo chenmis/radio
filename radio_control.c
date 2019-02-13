@@ -231,7 +231,7 @@ void * Listen_to_Station(void * args){
 				exit(EXIT_FAILURE);
 			} else if( num_of_bytes > 0) {
 
-				//fwrite (buffer , sizeof(char), num_of_bytes, songfp);
+				fwrite (buffer , sizeof(char), num_of_bytes, songfp);
 
 				memset((void *)buffer,0,1024);
 			}
@@ -302,12 +302,10 @@ void Start_Connection(){
 }
 
 void Close_All(){
-	printf("1");
+
 	close(udp_sock);
-	printf("2");
 	close(sock);
 	pthread_exit(&multicast_thread);
-	printf("3");
 }
 
 void print_menu(){
@@ -356,7 +354,7 @@ void Ask_Song(){
 	else if ( retval == 0 ){
 
 		perror("Timeout occur at Ask_song");
-		//Close_All();
+		Close_All();
 		//exit(EXIT_FAILURE);
 
 	} else {
@@ -519,6 +517,7 @@ void Up_Song(){
 			fscanf(song, "%1024c", UploadSong);
 			send(sock, UploadSong, BUFFER_SIZE,0);
 			songSize -= 1024;
+			usleep(62500);
 
 		}
 
